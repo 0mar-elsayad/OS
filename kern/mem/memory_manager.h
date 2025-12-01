@@ -27,6 +27,8 @@
 #define TABLE_IN_MEMORY 0
 #define TABLE_NOT_EXIST 1
 
+uint32 frame_to_va[1<<20];
+
 //***********************************
 /*2015*/ //USER HEAP STRATEGIES
 uint32 _UHeapPlacementStrategy;

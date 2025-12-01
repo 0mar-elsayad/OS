@@ -53,7 +53,21 @@ inline int pt_get_page_permissions(uint32* directory, uint32 virtual_address )
 {
 	//TODO: PRACTICE: fill this function.
 	//Comment the following line
-	panic("pt_get_page_permissions() is not implemented yet!");
+	//panic("pt_get_page_permissions() is not implemented yet!");
+
+	uint32 pt_index = PTX(virtual_address);
+
+	    uint32 *pt = NULL;
+	    int ret = get_page_table(directory, virtual_address, &pt);
+
+	    uint32 pte = pt[pt_index];
+
+	    // Page entry missing = page NOT mapped
+	    if ((pte & PERM_PRESENT) == 0)
+	        return 0;
+
+	    // Return PERMISSIONS ONLY
+	    return (pte & 0xFFF);
 }
 
 //===============================

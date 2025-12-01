@@ -165,6 +165,47 @@ void fault_handler(struct Trapframe *tf)
 			//TODO: [PROJECT'25.GM#3] FAULT HANDLER I - #2 Check for invalid pointers
 			//(e.g. pointing to unmarked user heap page, kernel or wrong access rights),
 			//your code is here
+			cprintf("[PF DEBUG] Fault at VA = %x\n", fault_va);
+
+						bool is_write = (tf->tf_err & FEC_WR);
+
+
+						// Case 2: PT exists check PTE
+						//page not mapped  valid first touch
+						 cprintf("aaaaaaaaaaaaaa @va=%x",fault_va);
+
+						        uint32 perm = pt_get_page_permissions(cur_env->env_page_directory, fault_va);
+						        cprintf("[PF DEBUG] Permissions = %x\n", perm);
+						        cprintf("da el gdeeed @va=%x",fault_va);
+
+						        if(fault_va >= USER_LIMIT){
+						        				cprintf("va=%x is out of user heap bounds\n", fault_va);
+						        				env_exit();
+						        			}
+
+						        // Not a user page
+
+						        if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+						        {
+						            // If PERM_UHPAGE is 0  INVALID
+						            if ((perm & PERM_PRESENT) == 0)
+						            {
+						                cprintf("[PF DEBUG] Unmarked UHeap page @%x  KILL\n", fault_va);
+						                env_exit();
+						            }
+						        }
+
+						        // Write fault but not writable
+						        if ((perm & PERM_PRESENT)&&is_write&&(perm & PERM_WRITEABLE)==0) {
+						            cprintf("[PF DEBUG] Write R/O  KILL\n");
+						            env_exit();
+						        }
+						        if ((perm & PERM_PRESENT) && !(perm & PERM_USER))
+						            env_exit();
+
+						        cprintf("da el gdeeed @va=%x",fault_va);
+
+
 
 			/*============================================================================================*/
 		}
@@ -253,13 +294,50 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 	int iWS =faulted_env->page_last_WS_index;
 	uint32 wsSize = env_page_ws_get_size(faulted_env);
 #endif
-	if(wsSize < (faulted_env->page_WS_max_size))
-	{
-		//TODO: [PROJECT'25.GM#3] FAULT HANDLER I - #3 placement
-		//Your code is here
-		//Comment the following line
-		panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
-	}
+	if (wsSize < (faulted_env->page_WS_max_size))
+	            {
+	                //cprintf("[PF DEBUG] Entering PLACEMENT for VA = %x\n", fault_va);
+	                uint32 va =fault_va;
+
+	                struct FrameInfo *frame = NULL;
+	                allocate_frame(&frame);
+	                if(frame== NULL){
+	                    panic("No free frames in placement");
+	                }
+
+	                bool is_user_heap  = (va >= USER_HEAP_START && va < USER_HEAP_MAX);
+	                bool is_user_stack = (va >= USTACKBOTTOM && va < USTACKTOP);
+
+	                uint32 map_perms = PERM_USER | PERM_WRITEABLE;
+	                map_frame(faulted_env->env_page_directory, frame, va, map_perms);
+
+	                int r = pf_read_env_page(faulted_env, (void*)va);
+
+	                if (r == E_PAGE_NOT_EXIST_IN_PF)
+	                {
+	                    if (!(is_user_heap || is_user_stack))
+	                    {
+	                        unmap_frame(faulted_env->env_page_directory, va);
+	                        //cprintf("[PF] placement: page not in PF and not stack/heap -> kill env (va=%x)\n", va);
+	                        env_exit();
+
+	                    }}
+	                fault_va=ROUNDDOWN(va,PAGE_SIZE);
+	                struct WorkingSetElement* b = env_page_ws_list_create_element(faulted_env, fault_va);
+
+
+	                       if(faulted_env->page_last_WS_element == NULL){
+	                           LIST_INSERT_TAIL(&(faulted_env->page_WS_list), b);
+
+	                           if (LIST_SIZE(&(faulted_env->page_WS_list)) == faulted_env->page_WS_max_size)
+	                               faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+	                       }
+	                       else
+	                           LIST_INSERT_BEFORE(&(faulted_env->page_WS_list), faulted_env->page_last_WS_element, b);
+
+	                        //env_page_ws_print(faulted_env);
+
+	                }
 	else
 	{
 		if (isPageReplacmentAlgorithmOPTIMAL())

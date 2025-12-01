@@ -10,6 +10,7 @@
 #include <kern/cmd/command_prompt.h>
 #include <kern/cpu/cpu.h>
 
+
 //void on_clock_update_WS_time_stamps();
 extern void cleanup_buffers(struct Env* e);
 //================
@@ -693,12 +694,80 @@ void env_set_priority(int envID, int priority)
 	//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #1 env_set_priority
 	//Your code is here
 	//Comment the following line
-	panic("env_set_priority() is not implemented yet...!!");
+	//panic("env_set_priority() is not implemented yet...!!");
+
+	acquire_kspinlock(&ProcessQueues.qlock);
+
+	struct Env *ptr_env = NULL;
+
+	int found = 0;
+						 // init ProcessQueues ??!!
+
+		//search in new queue
+		if (found==0 && queue_size(&ProcessQueues.env_new_queue) > 0)
+		{
+			LIST_FOREACH_SAFE(ptr_env, &ProcessQueues.env_new_queue, Env)
+			{
+				if(ptr_env->env_id == envID)
+				{
+					ptr_env->priority = priority;
+					ptr_env->clock_ready=0;
+					found = 1;
+					break;
+				}
+			}
+		}
+
+		//search in ready queues
+		if (found==0)
+			{
+				for (int i = 0 ; i < num_of_ready_queues ; i++)
+				{
+					if (queue_size(&ProcessQueues.env_ready_queues[i]) > 0)
+					{
+						ptr_env=NULL;
+						LIST_FOREACH_SAFE(ptr_env, &(ProcessQueues.env_ready_queues[i]), Env)
+						{
+							if(ptr_env->env_id == envID)
+							{
+								ptr_env->priority = priority;
+
+								//remove from old queue
+								sched_remove_ready(ptr_env);
+
+								//put in new priority queue after adjustment
+								ptr_env->clock_ready=0;
+								sched_insert_ready(ptr_env);
+
+								found = 1;
+								break;
+							}
+						}
+					}
+					if (found==1)
+						break;
+				}
+			}
+		if(found ==0)
+		{
+			struct Env* runningg = get_cpu_proc();
+			        if (runningg != NULL && runningg->env_id == envID)
+			        {
+			        	runningg->priority = priority;
+			        	runningg->clock_ready= 0;
+			            found = 1;
+			        }
+		}
+	release_kspinlock(&ProcessQueues.qlock);
+
 }
+
 void sched_set_starv_thresh(uint32 starvThresh)
 {
 	//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #1 sched_set_starv_thresh
 	//Your code is here
 	//Comment the following line
-	panic("sched_set_starv_thresh() is not implemented yet...!!");
+	//panic("sched_set_starv_thresh() is not implemented yet...!!");
+
+	starvationThresh = starvThresh;
 }

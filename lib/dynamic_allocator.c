@@ -58,13 +58,7 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 daEnd)
 	//Your code is here
 	//Comment the following line
 	//panic("initialize_dynamic_allocator() Not implemented yet");
-	/*
-	uint32 dynAllocStart = KERNEL_BASE;
-	uint32 dynAllocEnd = dynAllocStart + DYN_ALLOC_MAX_SIZE ;
 
-	daStart = dynAllocStart;
-	daEnd = dynAllocEnd;
-	*/
 
 		 dynAllocStart = daStart ;
 		 dynAllocEnd = daEnd ;
@@ -83,7 +77,7 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 daEnd)
 		LIST_INIT(&freePagesList);
 		 for(int i=0; i<num_pages; i++)
 		{
-			 // not list insert head??
+
 		LIST_INSERT_TAIL(&freePagesList, &pageBlockInfoArr[i]);
 		}
 
@@ -92,13 +86,6 @@ void initialize_dynamic_allocator(uint32 daStart, uint32 daEnd)
 
 		for(int i=0; i < (LOG2_MAX_SIZE - LOG2_MIN_SIZE + 1); i++ )
 		{
-			/* struct BlockElement_List x;
-			x.___ptr_next=NULL;
-			x.lh_first=NULL;
-			x.lh_last=NULL;
-			x.size=0;
-			freeBlockLists[i] = x ;*/
-
 			LIST_INIT(&freeBlockLists[i]);
 		}
 
@@ -116,17 +103,14 @@ __inline__ uint32 get_block_size(void *va)
 	//Your code is here
 	//Comment the following line
 	//panic("get_block_size() Not implemented yet");
-	int array_size = DYN_ALLOC_MAX_SIZE/PAGE_SIZE;
-	for(int i=0;i<array_size;i++)
-	{
+    // could this pointer return null ??
+	// is there a case I should consider here ?
+	// I think it depends on how the pageBlockinfoArr is initialized
+	// in case the page isn't allocated at the first page it will return size 0
 
-		if(pageBlockInfoArr[i].prev_next_info.le_next==va)
-			return pageBlockInfoArr[i+1].block_size;
-		else if (pageBlockInfoArr[i].prev_next_info.le_prev==va)
-				return pageBlockInfoArr[i-1].block_size;
-	}
-	return 0;
-
+	struct PageInfoElement * PIE =  to_page_info((uint32)va) ;
+	uint32  BS = (uint32)PIE -> block_size ; // block size
+	return BS ;
 
 }
 
@@ -188,15 +172,7 @@ void *alloc_block(uint32 size)
 		{
 			found_block = LIST_FIRST(&freeBlockLists[arr_index]);
 			LIST_REMOVE(&freeBlockLists[arr_index],found_block );
-			/*
-			for( int j=0; j< DYN_ALLOC_MAX_SIZE/PAGE_SIZE; j++ )
-			{
-				if(pageBlockInfoArr[j].block_size==size && pageBlockInfoArr[j].num_of_free_blocks > 0)
-					pageBlockInfoArr[j].num_of_free_blocks--;
-				else
-					continue;
-			}
-			 */
+
 			// Update the correct page info
 			uint32 block_va = (uint32)found_block;
 			uint32 page_start = ROUNDDOWN(block_va, PAGE_SIZE);
@@ -208,16 +184,14 @@ void *alloc_block(uint32 size)
 
 			return (void*)found_block;
 		}
-        // CASE 2 /*
+        // CASE 2
 		else if (LIST_SIZE(&freePagesList)!=0 )
 		{
-			/* has7ab page gededa fe page variable 3andy
-			 * ashelha men el free pages list
-			 * ashawer 3ala awel block feeha
-			 */
+
 			block_info_entry = LIST_FIRST(&freePagesList);
 			LIST_REMOVE(&freePagesList,block_info_entry);
-			// ALLOCATE PHYSICAL MEMORY FIRST!
+
+			// ALLOCATE PHYSICAL MEMORY FIRST!    ???????
 			uint32 start = to_page_va(block_info_entry);
 			if(get_page((void*)start) != 0) {
 				//panic("page failed!");
@@ -225,10 +199,11 @@ void *alloc_block(uint32 size)
 				LIST_INSERT_HEAD(&freePagesList, block_info_entry);
 				return NULL;
 			}
+
 			block_info_entry->block_size= size;
 			uint32 free_blocks = PAGE_SIZE / size;
 			block_info_entry->num_of_free_blocks= free_blocks -1 ;
-			//uint32 start = to_page_va(block_info_entry);
+
 			for (int i=1; i< free_blocks ; i++ )
 			{
 				found_block= (struct BlockElement *) (start + i*size);

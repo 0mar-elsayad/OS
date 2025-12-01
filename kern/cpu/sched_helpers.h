@@ -5,8 +5,10 @@
 #ifndef FOS_KERNEL
 # error "This is a FOS kernel header; user programs should not #include it"
 #endif
-
 #include <inc/environment_definitions.h>
+
+								//global variable henaaaa
+uint32 starvationThresh ;
 
 /*2023*/
 /********* for BSD Priority Scheduler *************/

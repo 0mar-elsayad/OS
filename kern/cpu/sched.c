@@ -10,6 +10,7 @@
 #include <kern/cmd/command_prompt.h>
 #include <kern/cpu/cpu.h>
 #include <kern/cpu/picirq.h>
+//#include <kern/cpu/sched_helpers.c>
 
 
 uint32 isSchedMethodRR(){return (scheduler_method == SCH_RR);}
@@ -225,9 +226,32 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 		//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #2 sched_init_PRIRR
 		//Your code is here
 		//Comment the following line
-		panic("sched_init_PRIRR() is not implemented yet...!!");
+		//panic("sched_init_PRIRR() is not implemented yet...!!");
 
 
+		//kclock_set_quantum(quantum);
+
+		//init_kspinlock(&ProcessQueues.qlock, "L");        <<<<<
+
+		sched_set_starv_thresh(starvThresh);
+
+		num_of_ready_queues = numOfPriorities;
+
+#if USE_KHEAP
+		//allocate memory
+		ProcessQueues.env_ready_queues = kmalloc(num_of_ready_queues * sizeof(struct Env_Queue));
+		quantums = kmalloc(1*sizeof(uint8));
+#endif
+		*quantums = quantum;
+
+		//initialize queues
+		for(int i=0; i < num_of_ready_queues ; i++ )
+		{
+			init_queue(&ProcessQueues.env_ready_queues[i]);
+			kclock_set_quantum(quantums[0]);
+		}
+		init_queue(&ProcessQueues.env_new_queue);
+		init_queue(&ProcessQueues.env_exit_queue);
 
 	}
 	//=========================================
@@ -313,7 +337,44 @@ struct Env* fos_scheduler_PRIRR()
 	//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #3 fos_scheduler_PRIRR
 	//Your code is here
 	//Comment the following line
-	panic("fos_scheduler_PRIRR() is not implemented yet...!!");
+	//panic("fos_scheduler_PRIRR() is not implemented yet...!!");
+
+	//acquire_kspinlock(&ProcessQueues.qlock);
+	struct Env *ptrr = get_cpu_proc();
+	struct Env *next_ptrr = NULL;
+
+	if ( ptrr != NULL)
+	{
+		ptrr->clock_ready=0;
+		sched_insert_ready(ptrr);
+	}
+
+	for (int i =0; i< num_of_ready_queues; i++)
+	{
+		if (&ProcessQueues.env_ready_queues[i].size > 0)
+		{
+			next_ptrr = dequeue(&(ProcessQueues.env_ready_queues[i]));
+			kclock_set_quantum(quantums[0]);
+			if (next_ptrr != NULL)
+				next_ptrr->clock_ready=0;
+			break;
+		}
+		/*
+		else if(ProcessQueues.env_new_queue.size > 0)
+		{
+			next_ptrr = dequeue(ProcessQueues.env_new_queue);
+		}
+		*/
+
+
+	}
+
+
+
+	//release_kspinlock(&ProcessQueues.qlock);
+
+	return next_ptrr;
+
 }
 
 //========================================
@@ -327,8 +388,32 @@ void clock_interrupt_handler(struct Trapframe* tf)
 		//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #4 clock_interrupt_handler
 		//Your code is here
 		//Comment the following line
-		panic("clock_interrupt_handler() is not implemented yet...!!");
+		//panic("clock_interrupt_handler() is not implemented yet...!!");
 
+		acquire_kspinlock(&ProcessQueues.qlock);
+
+		struct Env *element;
+
+		for(int i=num_of_ready_queues - 1; i > 0; i--)
+		{
+			if((ProcessQueues.env_ready_queues[i]).size > 0)
+			{
+				LIST_FOREACH_SAFE(element, (&ProcessQueues.env_ready_queues[i]), Env );
+				{
+
+					if(element != NULL && element->clock_ready >= starvationThresh)
+					{
+						remove_from_queue(&ProcessQueues.env_ready_queues[i], element);
+						element->priority--;
+						element->clock_ready = 0;
+						enqueue(&(ProcessQueues.env_ready_queues[element->priority]), element);
+
+					}
+				}
+			}
+		}
+
+		release_kspinlock(&ProcessQueues.qlock);
 
 
 	}

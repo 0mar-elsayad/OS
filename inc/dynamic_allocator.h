@@ -12,6 +12,9 @@
 #define DYN_ALLOC_MIN_BLOCK_SIZE (1<<LOG2_MIN_SIZE)		//8 BYTE
 #define DYN_ALLOC_MAX_BLOCK_SIZE (1<<LOG2_MAX_SIZE) 	//2 KB
 
+//////////////////by yomna///////////////////
+//uint32 mapStoI[DYN_ALLOC_MAX_BLOCK_SIZE+1];
+
 //[2] Data Structures
 struct BlockElement
 {
